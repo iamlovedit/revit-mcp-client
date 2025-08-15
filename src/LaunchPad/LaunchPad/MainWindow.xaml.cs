@@ -3,7 +3,7 @@ using System.IO;
 using System.Reflection;
 using System.Windows;
 using System.Windows.Documents;
-namespace WpfApp1
+namespace LaunchPad
 {
 
     public partial class MainWindow : Window
