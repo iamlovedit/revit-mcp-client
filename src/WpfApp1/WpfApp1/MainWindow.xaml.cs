@@ -14,6 +14,11 @@ namespace WpfApp1
         }
         async Task InstallNode()
         {
+            if (await IsCommandInstalled("node"))
+            {
+                AppendLine("Node.js已安装，跳过");
+                return;
+            }
             var tempPath = Path.GetTempPath();
             var msiPath = Path.Combine(tempPath, "node.msi");
             var buffer = Properties.Resources.NodeInstaller;
@@ -36,8 +41,32 @@ namespace WpfApp1
             }
         }
 
+        async Task InstallGit()
+        {
+            if (await IsCommandInstalled("git"))
+            {
+                AppendLine("Git已安装，跳过");
+                return;
+            }
+            var tempPath = Path.GetTempPath();
+            var gitPath = Path.Combine(tempPath, "git-installer.exe");
+            var buffer = Properties.Resources.GitInstaller;
+            File.WriteAllBytes(gitPath, buffer);
 
-        async Task ExecuteShellCommand(string fileName, string arguments)
+            try
+            {
+                AppendLine("正在安装Git");
+                await ExecuteShellCommand(gitPath,
+                    @"/VERYSILENT /NORESTART /SP- /SUPPRESSMSGBOXES /DIR=C:\Program Files\Git");
+                AppendLine("Git安装完成！");
+            }
+            finally
+            {
+                File.Delete(gitPath);
+            }
+        }
+
+        static async Task ExecuteShellCommand(string fileName, string arguments)
         {
             var psi = new ProcessStartInfo(fileName, arguments)
             {
@@ -48,7 +77,7 @@ namespace WpfApp1
             await process.WaitForExitAsync();
         }
 
-        static bool IsCommandInstalled(string command)
+        static async Task<bool> IsCommandInstalled(string command)
         {
             try
             {
@@ -58,10 +87,9 @@ namespace WpfApp1
                     UseShellExecute = false,
                     CreateNoWindow = true,
                 };
-                var proc = Process.Start(psi);
-                string output = proc?.StandardOutput.ReadToEnd() ?? "";
-                proc?.WaitForExit();
-                return output.StartsWith("v");
+                using var proc = Process.Start(psi);
+                await proc?.WaitForExitAsync();
+                return proc?.ExitCode == 0;
             }
             catch
             {
@@ -71,14 +99,21 @@ namespace WpfApp1
 
         private async void StartButton_Click(object sender, RoutedEventArgs e)
         {
-            if (!IsCommandInstalled("node"))
+            if (string.IsNullOrEmpty(ApiKeyTextBox.Text))
             {
-                await InstallNode();
+                MessageBox.Show("请先填写api key");
+                return;
             }
+
+            await InstallNode();
+
+            await InstallGit();
+
             AppendLine("正在配置npm镜像");
             await ExecuteShellCommand("npm", "config set registry https://registry.npmmirror.com");
             AppendLine("配置npm镜像完成");
             await Task.Delay(1000);
+
             AppendLine("正在安装Claude code");
             await ExecuteShellCommand("npm", "install -g @anthropic-ai/claude-code");
             AppendLine("Claude code安装完成");
@@ -98,15 +133,27 @@ namespace WpfApp1
             }
             var fileName = "configuration.json";
             var dir = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
-            File.Copy(Path.Combine(dir, fileName), Path.Combine(configDir, "config.json"));
-            Process.Start(configDir);
+            var configFile = Path.Combine(dir, fileName);
+            var configText = File.ReadAllText(configFile);
+            configText = configText.Replace("${APIKEY}", ApiKeyTextBox.Text);
+            var targetConfigFile = Path.Combine(configDir, "config.json");
+            File.WriteAllText(targetConfigFile, configText);
             AppendLine("配置完成");
         }
 
         private void Hyperlink_Click(object sender, RoutedEventArgs e)
         {
-            var url = ((Hyperlink)sender).NavigateUri.ToString();
-            Process.Start(new ProcessStartInfo(url));
+            var url = ((Hyperlink)sender).NavigateUri.AbsoluteUri;
+            try
+            {
+                Process.Start(new ProcessStartInfo(url));
+            }
+            catch (Exception)
+            {
+                Clipboard.SetText(url);
+                MessageBox.Show("已复制链接，请到浏览器打开！");
+            }
+
         }
 
         private void AppendLine(string text)

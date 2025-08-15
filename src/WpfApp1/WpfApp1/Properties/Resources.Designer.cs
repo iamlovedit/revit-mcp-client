@@ -63,6 +63,16 @@ namespace WpfApp1.Properties {
         /// <summary>
         ///   Looks up a localized resource of type System.Byte[].
         /// </summary>
+        internal static byte[] GitInstaller {
+            get {
+                object obj = ResourceManager.GetObject("GitInstaller", resourceCulture);
+                return ((byte[])(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Byte[].
+        /// </summary>
         internal static byte[] NodeInstaller {
             get {
                 object obj = ResourceManager.GetObject("NodeInstaller", resourceCulture);
